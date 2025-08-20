@@ -1,0 +1,104 @@
+version: "3.9"
+
+services:
+  # -------------------- SET 1: Normal Token Bucket (/app2) --------------------
+  redis_tb:
+    image: redis:7-alpine
+    container_name: redis_tb
+    ports:
+      - "6379:6379"
+    platform: linux/arm64
+
+  app1_tb:
+    build: ./app2
+    container_name: app1_tb
+    environment:
+      - REDIS_URL=redis://redis_tb:6379
+      - ALGO_TYPE=token_bucket
+    depends_on:
+      - redis_tb
+    platform: linux/arm64
+
+  app2_tb:
+    build: ./app2
+    container_name: app2_tb
+    environment:
+      - REDIS_URL=redis://redis_tb:6379
+      - ALGO_TYPE=token_bucket
+    depends_on:
+      - redis_tb
+    platform: linux/arm64
+
+  nginx_tb:
+    image: nginx:alpine
+    container_name: nginx_tb
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx_tb.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app1_tb
+      - app2_tb
+    platform: linux/arm64
+
+  k6_tb:
+    image: grafana/k6
+    container_name: k6_tb
+    volumes:
+      - ./tests_tb:/scripts
+    working_dir: /scripts
+    entrypoint: ["sleep", "infinity"]
+    depends_on:
+      - nginx_tb
+    platform: linux/arm64
+
+  # -------------------- SET 2: Custom Algorithm (/app) --------------------
+  redis_ca:
+    image: redis:7-alpine
+    container_name: redis_ca
+    ports:
+      - "6380:6379"
+    platform: linux/arm64
+
+  app1_ca:
+    build: ./app
+    container_name: app1_ca
+    environment:
+      - REDIS_URL=redis://redis_ca:6379
+      - ALGO_TYPE=custom
+    depends_on:
+      - redis_ca
+    platform: linux/arm64
+
+  app2_ca:
+    build: ./app
+    container_name: app2_ca
+    environment:
+      - REDIS_URL=redis://redis_ca:6379
+      - ALGO_TYPE=custom
+    depends_on:
+      - redis_ca
+    platform: linux/arm64
+
+  nginx_ca:
+    image: nginx:alpine
+    container_name: nginx_ca
+    ports:
+      - "8081:80"
+    volumes:
+      - ./nginx_ca.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app1_ca
+      - app2_ca
+    platform: linux/arm64
+
+  k6_ca:
+    image: grafana/k6
+    container_name: k6_ca
+    volumes:
+      - ./tests_ca:/scripts
+    working_dir: /scripts
+    entrypoint: ["sleep", "infinity"]
+    depends_on:
+      - nginx_ca
+    platform: linux/arm64
